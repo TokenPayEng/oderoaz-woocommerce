@@ -171,22 +171,25 @@ class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
             "x-auth-version: 1",
         ));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
         $response = curl_exec($ch);
+        $header = curl_getinfo( $ch );
+        curl_close( $ch );
 
         if( !is_wp_error( $response ) ) {
-            if( curl_getinfo( $ch, CURLINFO_HTTP_CODE ) == '200' )
-            {
-                $json = json_decode($response, TRUE, JSON_PRETTY_PRINT);
+
+            if( $header['http_code'] == 200 ) {
                 wc_add_notice($response, 'error');
-                wc_add_notice($json, 'error');
+                $content = json_decode($response,true);
+
+                return array(
+                    'result' => 'success',
+                    'redirect' => "https://google.com"
+                );
+            } else {
+                wc_add_notice('Something went wrong. Please try again.', 'error');
+                return;
             }
 
-//            $body = json_decode( $response['body'], true );
-
-//            // it could be different depending on your payment processor
-//            if ( $body['response']['responseCode'] == 'APPROVED' ) {
-//
 //                // we received the payment
 //                $order->payment_complete();
 //                $order->reduce_order_stock();
@@ -202,18 +205,9 @@ class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
 //                    'result' => 'success',
 //                    'redirect' => $this->get_return_url( $order )
 //                );
-//
-//            } else {
-//                wc_add_notice('Please try again.', 'error');
-//                return;
-//            }
-
         } else {
             wc_add_notice('Connection error.', 'error');
-            curl_close($ch);
             return;
         }
-
-        curl_close($ch);
     }
 }
