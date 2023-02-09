@@ -50,6 +50,8 @@ class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
 
         // We need custom JavaScript to obtain a token
         add_action( 'wp_enqueue_scripts', array( $this, 'payment_scripts' ) );
+
+        add_action( 'woocommerce_api_odero-complete-payment', array( $this, 'webhook' ) );
     }
 
     /**
@@ -180,6 +182,11 @@ class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
             if( $code == 200 ) {
                 $json = json_decode($json_data, true);
 
+                $order->update_status( 'pending-payment',  __( 'Awaiting Odero payment completion. Check merchant panel in case it takes too long.', 'odero-az') );
+
+                // Empty cart
+                $woocommerce->cart->empty_cart();
+
                 return array(
                     'result' => 'success',
                     'redirect' => $json['data']['pageUrl']
@@ -188,25 +195,20 @@ class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
                 wc_add_notice('Something went wrong. Please try again.', 'error');
                 return;
             }
-
-//                // we received the payment
-//                $order->payment_complete();
-//                $order->reduce_order_stock();
-//
-//                // some notes to customer (replace true with false to make it private)
-//                $order->add_order_note( 'Hey, your order is paid! Thank you!', true );
-//
-//                // Empty cart
-//                $woocommerce->cart->empty_cart();
-//
-//                // Redirect to the thank-you page
-//                return array(
-//                    'result' => 'success',
-//                    'redirect' => $this->get_return_url( $order )
-//                );
         } else {
             wc_add_notice('Connection error.', 'error');
             return;
         }
+    }
+
+    // TODO:
+    public function webhook() {
+
+        $order = wc_get_order( $_GET['id'] );
+        $order->payment_complete();
+        $order->reduce_order_stock();
+        $order->add_order_note( 'Hey, your order is paid! Thank you!', true );
+
+        update_option('webhook_debug', $_GET);
     }
 }
