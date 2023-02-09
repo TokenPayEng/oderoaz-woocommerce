@@ -18,7 +18,6 @@ function generateSignature($baseUrl, $apiKey, $secretKey, $randomKey, $body = nu
         return base64_encode(hash('sha256', $hashStr, true));
 }
 
-
 class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
 
     /**
@@ -171,20 +170,21 @@ class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
             "x-auth-version: 1",
         ));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
         $response = curl_exec($ch);
-        $header = curl_getinfo( $ch );
+        $json_data = mb_substr($response, curl_getinfo($ch, CURLINFO_HEADER_SIZE));
+        $data = json_decode($json_data);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close( $ch );
 
         if( !is_wp_error( $response ) ) {
-
-            if( $header['http_code'] == 200 ) {
-                wc_add_notice($response, 'error');
-                $content = json_decode($response,true);
-
-                return array(
-                    'result' => 'success',
-                    'redirect' => "https://google.com"
-                );
+            if( $code == 200 ) {
+                wc_add_notice($json_data, 'error');
+//                wc_add_notice($data, 'error');
+//                return array(
+//                    'result' => 'success',
+//                    'redirect' => $responseBody
+//                );
             } else {
                 wc_add_notice('Something went wrong. Please try again.', 'error');
                 return;
