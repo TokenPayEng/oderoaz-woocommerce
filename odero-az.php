@@ -7,29 +7,23 @@
  * Version: 1.0.0
  */
 
+define( 'WC_ODERO_AZ_PLUGIN_URL', untrailingslashit( plugins_url( basename( plugin_dir_path( __FILE__ ) ), basename( __FILE__ ) ) ) );
+
 add_action('plugins_loaded', 'woocommerce_gateway_name_init', 0);
 function woocommerce_gateway_name_init() {
     if ( !class_exists( 'WC_Payment_Gateway' ) ) return;
-    /**
-     * Localisation
-     */
-    load_plugin_textdomain('wc-gateway-name', false, dirname( plugin_basename( __FILE__ ) ) . '/languages');
 
     /**
-     * Gateway class
+     * Gateway class in includes directory
      */
-    class WC_Gateway_Name extends WC_Payment_Gateway {
-
-        // Go wild in here
-    }
+    include_once( 'includes/wc-gateway-odero-az.php' );
 
     /**
      * Add the Gateway to WooCommerce
      **/
-    function woocommerce_add_gateway_name_gateway($methods) {
-        $methods[] = 'WC_Gateway_Name';
+    add_filter('woocommerce_payment_gateways', 'add_gateway');
+    function add_gateway($methods) {
+        $methods[] = 'WC_Gateway_Odero_Az';
         return $methods;
     }
-
-    add_filter('woocommerce_payment_gateways', 'woocommerce_add_gateway_name_gateway' );
 }
