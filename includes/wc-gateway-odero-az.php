@@ -121,6 +121,25 @@ class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
         // we need it to get any order details
         $order = wc_get_order( $order_id );
 
+        // let's decide what order item types we would like to get
+        $types = array( 'line_item', 'fee', 'shipping', 'coupon' );
+
+        $items = [];
+        // iterating through each order item in the order
+        foreach($order->get_items( $types ) as $item ) {
+            // product only ( out of line_item | fee | shipping | coupon)
+            if( $item->is_type( 'line_item' ) ) {
+
+                // product price
+                $item_total = $item->get_total();
+
+                // product name
+                $item_name = $item->get_name();
+                $items[] = array('name' => $item_name, 'price' => $item_total);
+            }
+        }
+
+        // odero needed variables
         $paymentURL = "https://sandbox-api-gateway.oderopay.com.tr/payment/v1/checkout-payments/init";
         $requestBody = array(
             'price' => $order->get_total(),
@@ -128,18 +147,8 @@ class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
             'currency' => Currency::TL,
             'paymentGroup' => PaymentGroup::PRODUCT,
             'callbackUrl' => 'NO_CALLBACK_URL',
-            'items' => [
-                array(
-                    'name' => 'Item 1',
-                    'price' => "30",
-                ),
-                array(
-                    'name' => 'Item 2',
-                    'price' => "50",
-                ),
-            ]
+            'items' => $items
         );
-
         $signature = generateSignature($paymentURL, $this->publishable_key, $this->private_key, '111', $requestBody);
 
         /**
@@ -154,6 +163,7 @@ class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($requestBody));
         curl_setopt($ch, CURLOPT_HEADER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            "Accept: application/json",
             "Content-Type: application/json",
             "x-api-key: ". $this->publishable_key,
             "x-rnd-key: 111",
@@ -163,39 +173,47 @@ class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
         $response = curl_exec($ch);
-        curl_close($ch);
 
         if( !is_wp_error( $response ) ) {
-
-            $body = json_decode( $response['body'], true );
-
-            // it could be different depending on your payment processor
-            if ( $body['response']['responseCode'] == 'APPROVED' ) {
-
-                // we received the payment
-                $order->payment_complete();
-                $order->reduce_order_stock();
-
-                // some notes to customer (replace true with false to make it private)
-                $order->add_order_note( 'Hey, your order is paid! Thank you!', true );
-
-                // Empty cart
-                $woocommerce->cart->empty_cart();
-
-                // Redirect to the thank-you page
-                return array(
-                    'result' => 'success',
-                    'redirect' => $this->get_return_url( $order )
-                );
-
-            } else {
-                wc_add_notice('Please try again.', 'error');
-                return;
+            if( curl_getinfo( $ch, CURLINFO_HTTP_CODE ) == '200' )
+            {
+                $json = json_decode($response, TRUE, JSON_PRETTY_PRINT);
+                wc_add_notice($response, 'error');
+                wc_add_notice($json, 'error');
             }
+
+//            $body = json_decode( $response['body'], true );
+
+//            // it could be different depending on your payment processor
+//            if ( $body['response']['responseCode'] == 'APPROVED' ) {
+//
+//                // we received the payment
+//                $order->payment_complete();
+//                $order->reduce_order_stock();
+//
+//                // some notes to customer (replace true with false to make it private)
+//                $order->add_order_note( 'Hey, your order is paid! Thank you!', true );
+//
+//                // Empty cart
+//                $woocommerce->cart->empty_cart();
+//
+//                // Redirect to the thank-you page
+//                return array(
+//                    'result' => 'success',
+//                    'redirect' => $this->get_return_url( $order )
+//                );
+//
+//            } else {
+//                wc_add_notice('Please try again.', 'error');
+//                return;
+//            }
 
         } else {
             wc_add_notice('Connection error.', 'error');
+            curl_close($ch);
             return;
         }
+
+        curl_close($ch);
     }
 }
