@@ -141,7 +141,7 @@ class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
         }
 
         // odero needed variables
-        $paymentURL = "https://sandbox-api-gateway.oderopay.com.tr/payment/v1/checkout-payments/init";
+        $paymentURL = $this->testmode ? "https://sandbox-api-gateway.oderopay.com.tr/payment/v1/checkout-payments/init" : "https://api-gateway.oderopay.com.tr/payment/v1/checkout-payments/init";
         $requestBody = array(
             'price' => $order->get_total(),
             'paidPrice' => $order->get_total(),
