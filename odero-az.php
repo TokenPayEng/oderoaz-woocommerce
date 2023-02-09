@@ -17,6 +17,8 @@ function woocommerce_gateway_name_init() {
      * Gateway class in includes directory
      */
     include_once( 'includes/wc-gateway-odero-az.php' );
+    include_once( 'models/Currency.php' );
+    include_once( 'models/PaymentGroup.php' );
 
     /**
      * Add the Gateway to WooCommerce

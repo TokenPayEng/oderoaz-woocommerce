@@ -7,6 +7,20 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * @extends WC_Payment_Gateway
  */
+
+function generateSignature($baseUrl, $apiKey, $secretKey, $randomKey, $body = null) {
+        $requestBody= "";
+        if ($body) {
+            $requestBody = json_encode($body);
+        }
+
+        $hashStr = urldecode($baseUrl) . $apiKey . $secretKey . $randomKey . $requestBody;
+        wc_add_notice($hashStr, 'error');
+        wc_add_notice(base64_encode(hash('sha256', $hashStr, true)), 'error');
+        return base64_encode(hash('sha256', $hashStr, true));
+}
+
+
 class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
 
     /**
@@ -101,47 +115,83 @@ class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
     }
 
     /**
-     * Create init cpp request
+     * Processing the payments here
      */
-//    public function init_payment_page() {
-//        $request = array(
-//            'price' => 100,
-//            'paidPrice' => 100,
-//            'walletPrice' => 0,
-//            'installment' => 1,
-//            'currency' => Currency::AZN,
-//            'paymentGroup' => PaymentGroup::PRODUCT,
-//            'conversationId' => '456d1297-908e-4bd6-a13b-4be31a6e47d5',
-//            'cardUserKey' => 'eee24372-1735-4bc1-a534-023f1e02a03e',
-//            'callbackUrl' => 'https://www.your-website.com/tokenpay-checkout-callback',
-//            'buyerId' => 1,
-//            'items' => array(
-//                array(
-//                    'externalId' => uniqid(),
-//                    'name' => 'Item 1',
-//                    'price' => 30,
-//                    'subMerchantId' => 1,
-//                    'subMerchantPrice' => 27
-//                ),
-//                array(
-//                    'externalId' => uniqid(),
-//                    'name' => 'Item 2',
-//                    'price' => 50,
-//                    'subMerchantId' => 2,
-//                    'subMerchantPrice' => 42
-//                ),
-//                array(
-//                    'externalId' => uniqid(),
-//                    'name' => 'Item 3',
-//                    'price' => 20,
-//                    'subMerchantId' => 3,
-//                    'subMerchantPrice' => 18
-//                )
-//            )
-//        );
-//
-//        $response = FunctionalTestConfig::tokenpay()->payment()->initCheckoutPayment($request);
-//
-//        print_r($response);
-//    }
+    public function process_payment( $order_id ) {
+        global $woocommerce;
+
+        // we need it to get any order details
+        $order = wc_get_order( $order_id );
+
+        $paymentURL = "https://sandbox-api-gateway.oderopay.com.tr/payment/v1/checkout-payments/init";
+        $requestBODY = array(
+            'price' => $order->get_total(),
+            'paidPrice' => $order->get_total(),
+            'currency' => Currency::TL,
+            'paymentGroup' => PaymentGroup::PRODUCT,
+            'callbackUrl' => 'NO_CALLBACK_URL',
+            'items' => array(
+                array(
+                    'name' => 'Item 1',
+                    'price' => 30,
+                ),
+                array(
+                    'name' => 'Item 2',
+                    'price' => 50,
+                ),
+            )
+        );
+        $signature = generateSignature($paymentURL, $this->publishable_key, $this->private_key, '111', $requestBODY);
+
+        /*
+          * Array with parameters for API interaction
+         */
+        $args = array(
+            'headers' => array(
+                "x-api-key" => $this->publishable_key,
+                "x-rnd-key" => '111',
+                "x-signature" => $signature,
+                "x-auth-version" => '1',
+            ),
+            'body' => $requestBODY,
+        );
+
+        /**
+         * Your API interaction could be built with wp_remote_post()
+         */
+        $response = wp_remote_post($paymentURL, $args);
+
+        if( !is_wp_error( $response ) ) {
+
+            $body = json_decode( $response['body'], true );
+
+            // it could be different depending on your payment processor
+            if ( $body['response']['responseCode'] == 'APPROVED' ) {
+
+                // we received the payment
+                $order->payment_complete();
+                $order->reduce_order_stock();
+
+                // some notes to customer (replace true with false to make it private)
+                $order->add_order_note( 'Hey, your order is paid! Thank you!', true );
+
+                // Empty cart
+                $woocommerce->cart->empty_cart();
+
+                // Redirect to the thank-you page
+                return array(
+                    'result' => 'success',
+                    'redirect' => $this->get_return_url( $order )
+                );
+
+            } else {
+                wc_add_notice('Please try again.', 'error');
+                return;
+            }
+
+        } else {
+            wc_add_notice('Connection error.', 'error');
+            return;
+        }
+    }
 }
