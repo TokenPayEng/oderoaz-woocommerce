@@ -124,74 +124,94 @@ class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
         $order = wc_get_order( $order_id );
 
         $paymentURL = "https://sandbox-api-gateway.oderopay.com.tr/payment/v1/checkout-payments/init";
-        $requestBODY = array(
+        $requestBody = array(
             'price' => $order->get_total(),
             'paidPrice' => $order->get_total(),
             'currency' => Currency::TL,
             'paymentGroup' => PaymentGroup::PRODUCT,
             'callbackUrl' => 'NO_CALLBACK_URL',
-            'items' => array(
+            'items' => [
                 array(
                     'name' => 'Item 1',
-                    'price' => 30,
+                    'price' => "30",
                 ),
                 array(
                     'name' => 'Item 2',
-                    'price' => 50,
+                    'price' => "50",
                 ),
-            )
+            ]
         );
-        $signature = generateSignature($paymentURL, $this->publishable_key, $this->private_key, '111', $requestBODY);
+
+        $signature = generateSignature($paymentURL, $this->publishable_key, $this->private_key, '111', $requestBody);
 
         /*
           * Array with parameters for API interaction
          */
         $args = array(
             'headers' => array(
-                "x-api-key" => $this->publishable_key,
-                "x-rnd-key" => '111',
-                "x-signature" => $signature,
-                "x-auth-version" => '1',
+                "Content-Type: application/json",
+                "x-api-key: ". $this->publishable_key,
+                "x-rnd-key: 111",
+                "x-signature: ". $signature,
+                "x-auth-version: 1",
             ),
-            'body' => $requestBODY,
+            'body' => json_encode($requestBody),
         );
 
         /**
          * Your API interaction could be built with wp_remote_post()
          */
-        $response = wp_remote_post($paymentURL, $args);
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, urldecode($paymentURL));
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($requestBody));
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            "Content-Type: application/json",
+            "x-api-key: ". $this->publishable_key,
+            "x-rnd-key: 111",
+            "x-signature: ". $signature,
+            "x-auth-version: 1",
+        ));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $resultApiData = cur;
 
-        if( !is_wp_error( $response ) ) {
+        //$response = wp_remote_post(urldecode($paymentURL), $args);
 
-            $body = json_decode( $response['body'], true );
-
-            // it could be different depending on your payment processor
-            if ( $body['response']['responseCode'] == 'APPROVED' ) {
-
-                // we received the payment
-                $order->payment_complete();
-                $order->reduce_order_stock();
-
-                // some notes to customer (replace true with false to make it private)
-                $order->add_order_note( 'Hey, your order is paid! Thank you!', true );
-
-                // Empty cart
-                $woocommerce->cart->empty_cart();
-
-                // Redirect to the thank-you page
-                return array(
-                    'result' => 'success',
-                    'redirect' => $this->get_return_url( $order )
-                );
-
-            } else {
-                wc_add_notice('Please try again.', 'error');
-                return;
-            }
-
-        } else {
-            wc_add_notice('Connection error.', 'error');
-            return;
-        }
+//        if( !is_wp_error( $response ) ) {
+//
+//            $body = json_decode( $response['body'], true );
+//
+//            // it could be different depending on your payment processor
+//            if ( $body['response']['responseCode'] == 'APPROVED' ) {
+//
+//                // we received the payment
+//                $order->payment_complete();
+//                $order->reduce_order_stock();
+//
+//                // some notes to customer (replace true with false to make it private)
+//                $order->add_order_note( 'Hey, your order is paid! Thank you!', true );
+//
+//                // Empty cart
+//                $woocommerce->cart->empty_cart();
+//
+//                // Redirect to the thank-you page
+//                return array(
+//                    'result' => 'success',
+//                    'redirect' => $this->get_return_url( $order )
+//                );
+//
+//            } else {
+//                wc_add_notice('Please try again.', 'error');
+//                return;
+//            }
+//
+//        } else {
+//            wc_add_notice('Connection error.', 'error');
+//            return;
+//        }
     }
 }
