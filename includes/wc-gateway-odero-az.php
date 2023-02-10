@@ -157,8 +157,8 @@ class WC_Gateway_Odero_Az extends WC_Payment_Gateway {
          */
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, urldecode($paymentURL));
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $this->testmode ? 0 : 1);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $this->testmode ? 0 : 1);
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($requestBody));
